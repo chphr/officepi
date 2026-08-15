@@ -1,0 +1,89 @@
+version: "3.9"
+
+networks:
+  homelab:
+    driver: bridge
+
+volumes:
+  adguard_work:
+  adguard_conf:
+  gophish_data:
+  foundry_data:
+
+services:
+
+  # ---------------------------------------------------------------
+  # Cloudflare Tunnel — the ONLY thing that talks to the internet.
+  # No inbound ports opened on the Pi or router at all.
+  # Public routes are configured in the Cloudflare Zero Trust dashboard.
+  # ---------------------------------------------------------------
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: unless-stopped
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    networks:
+      - homelab
+
+  # ---------------------------------------------------------------
+  # AdGuard Home — network-wide DNS / ad blocking
+  # NOTE: port 53 conflicts with systemd-resolved by default on
+  # Raspberry Pi OS. See README "Before you start" section.
+  # ---------------------------------------------------------------
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3000:3000/tcp"   # first-run setup wizard
+      - "80:80/tcp"       # web UI after setup (change if you run something else on 80)
+    volumes:
+      - adguard_work:/opt/adguardhome/work
+      - adguard_conf:/opt/adguardhome/conf
+
+  # ---------------------------------------------------------------
+  # Gophish — phishing simulation / security awareness training
+  # SECURITY: admin UI (3333) is intentionally NOT routed through
+  # cloudflared. Access it only via LAN or VPN (Tailscale, WireGuard).
+  # Only add the landing-page port to the tunnel if you're actively
+  # running an external campaign.
+  # ---------------------------------------------------------------
+  gophish:
+    image: gophish/gophish:latest
+    container_name: gophish
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "127.0.0.1:3333:3333"   # admin UI — bound to localhost only
+      - "8080:80"               # phishing landing page (only if needed)
+    volumes:
+      - gophish_data:/opt/gophish/data
+      - ./services/gophish/config.json:/opt/gophish/config.json:ro
+
+  # ---------------------------------------------------------------
+  # Foundry VTT — virtual tabletop
+  # Community-maintained image; requires your own Foundry license
+  # credentials, supplied via .env (never commit these).
+  # ---------------------------------------------------------------
+  foundryvtt:
+    image: felddy/foundryvtt:release
+    container_name: foundryvtt
+    restart: unless-stopped
+    networks:
+      - homelab
+    ports:
+      - "30000:30000"
+    environment:
+      - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
+      - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD}
+      - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN_KEY}
+      - CONTAINER_PRESERVE_CONFIG=true
+    volumes:
+      - foundry_data:/data

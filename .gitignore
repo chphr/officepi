@@ -1,0 +1,16 @@
+# Secrets — never commit
+.env
+
+# Local backup archives
+backups/
+*.tar.gz
+
+# Service runtime data if ever bind-mounted locally instead of named volumes
+services/gophish/data/
+services/adguardhome/work/
+services/adguardhome/conf/
+services/foundryvtt/data/
+
+# OS/editor cruft
+.DS_Store
+*.swp
