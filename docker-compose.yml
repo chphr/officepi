@@ -1,5 +1,3 @@
-version: "3.9"
-
 networks:
   homelab:
     driver: bridge
@@ -55,7 +53,7 @@ services:
   # running an external campaign.
   # ---------------------------------------------------------------
   gophish:
-    image: gophish/gophish:latest
+    image: opensecnetwork/gophish:multi-arch   # amd64+arm64 rebuild of the official image
     container_name: gophish
     restart: unless-stopped
     networks:
@@ -79,11 +77,14 @@ services:
     networks:
       - homelab
     ports:
-      - "30000:30000"
+      - "127.0.0.1:30000:30000"   # local-only; public access goes through the Cloudflare Tunnel
     environment:
       - FOUNDRY_USERNAME=${FOUNDRY_USERNAME}
       - FOUNDRY_PASSWORD=${FOUNDRY_PASSWORD}
       - FOUNDRY_ADMIN_KEY=${FOUNDRY_ADMIN_KEY}
       - CONTAINER_PRESERVE_CONFIG=true
+      - FOUNDRY_HOSTNAME=vtt.christoph-rieger.ca
+      - FOUNDRY_PROXY_SSL=true
+      - FOUNDRY_PROXY_PORT=443
     volumes:
       - foundry_data:/data
